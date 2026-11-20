@@ -54,6 +54,10 @@
         <i class="bi bi-exclamation-triangle"></i>
         Answers are AI-generated from the department FAQ. Verify important information with the office.
       </div>
+      <div class="alert alert-info rounded-0 mb-0 py-2 small d-none" role="status" id="demoBanner">
+        <i class="bi bi-plug"></i>
+        Demo mode: no API key found. Answers come from offline FAQ matching, not AI. Add LLM_API_KEY in .env to use the Groq AI.
+      </div>
 
       <div class="card-body chat-body" id="chatBody">
         <div class="text-center text-muted my-5" id="chatEmpty">
@@ -220,6 +224,7 @@
             <tr><th>Repo</th><td><a href="https://github.com/azeemworks925-eng/vibejam-70181078" target="_blank" rel="noopener">https://github.com/azeemworks925-eng/vibejam-70181078</a></td></tr>
             <tr><th>LLM API &amp; model</th><td>Groq API (openai/gpt-oss-120b, fallback: qwen/qwen3.8-27b)</td></tr>
             <tr><th>AI tools used</th><td>Claude Code (Opus 5.5), Claude</td></tr>
+            <tr><th>Current mode</th><td id="aboutMode">Checking...</td></tr>
           </tbody>
         </table>
       </div>

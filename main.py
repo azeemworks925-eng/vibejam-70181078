@@ -20,6 +20,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+import demo
 from prompt import SYSTEM_PROMPT, build_user_message
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -108,6 +109,17 @@ def get_api_key():
     """Re-read .env on every request, so a changed key works without restart."""
     values = dotenv_values(ENV_PATH) if ENV_PATH.exists() else {}
     return (values.get("LLM_API_KEY") or os.environ.get("LLM_API_KEY") or "").strip()
+
+
+# Values that mean "no real key yet" (the placeholder from .env.example).
+PLACEHOLDER_KEYS = {"your-groq-api-key-here", "your-gemini-api-key-here"}
+
+
+def get_mode(api_key):
+    """'demo' = no key -> offline FAQ matcher (demo.py). 'ai' = any key set (even an invalid one) -> Groq."""
+    if not api_key or api_key in PLACEHOLDER_KEYS:
+        return "demo"
+    return "ai"
 
 
 class AIServiceError(Exception):
@@ -232,17 +244,30 @@ def chat(req: ChatRequest):
 
     faqs = load_faqs()  # read fresh every time -> new FAQs are used immediately
     api_key = get_api_key()
-    try:
-        raw = ask_ai(api_key, build_user_message(faqs, message.strip()))
-    except AIServiceError as e:
-        print("AI service error:", e)  # logged on server only, never the key
-        return {"status": "error"}
+    mode = get_mode(api_key)
 
-    result = validate_reply(raw, faqs, api_key)
+    if mode == "demo":
+        result = demo.answer(message.strip(), faqs)  # offline matcher, no AI
+    else:
+        try:
+            raw = ask_ai(api_key, build_user_message(faqs, message.strip()))
+        except AIServiceError as e:
+            print("AI service error:", e)  # logged on server only, never the key
+            return {"status": "error", "mode": mode}
+        result = validate_reply(raw, faqs, api_key)
+
     if result is None:
-        return {"status": "not_found"}
+        return {"status": "not_found", "mode": mode}
     answer, ids = result
-    return {"status": "found", "answer": answer, "faq_ids": ids}
+    return {"status": "found", "answer": answer, "faq_ids": ids, "mode": mode}
+
+
+@app.get("/api/status")
+def status():
+    """Tells the frontend which mode is active. Never returns the key itself."""
+    mode = get_mode(get_api_key())
+    return {"mode": mode, "provider": "Groq" if mode == "ai" else None,
+            "model": list(GROQ_MODELS)[0] if mode == "ai" else None}
 
 
 @app.get("/api/faqs")

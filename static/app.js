@@ -29,6 +29,7 @@ function showTab(name) {
     b.classList.toggle("active", b.dataset.tab === name)
   );
   if (name === "faqs") loadFaqs();
+  if (name === "chat" || name === "about") loadStatus();
   if (name === "stats") loadFaqs().then(renderStats);
   if (name === "chat") $("chatInput").focus();
 }
@@ -210,6 +211,7 @@ $("chatForm").addEventListener("submit", async (e) => {
 
   hideTyping();
   setWaiting(false);
+  if (data.mode) setMode(data.mode);   // key added/removed in .env -> banner updates live
 
   stats.asked++;
   if (data.status === "found") {
@@ -487,6 +489,29 @@ $("themeBtn").addEventListener("click", () => {
 });
 applyTheme(document.documentElement.getAttribute("data-bs-theme") || "light");
 
+// =====================================================================
+// Mode: "ai" (Groq) or "demo" (no API key -> offline FAQ matching)
+// =====================================================================
+function setMode(mode, model) {
+  $("demoBanner").classList.toggle("d-none", mode !== "demo");
+  if (mode === "demo") {
+    $("aboutMode").textContent = "Demo mode: offline FAQ matching, no API key (not AI)";
+  } else if (mode === "ai") {
+    $("aboutMode").textContent = "AI mode: Groq" + (model ? " (" + model + ")" : "");
+  }
+}
+
+async function loadStatus() {
+  try {
+    const res = await fetch("/api/status");
+    const data = await res.json();
+    setMode(data.mode, data.model);
+  } catch {
+    $("aboutMode").textContent = "Unknown (server not reachable)";
+  }
+}
+
 // initial load
+loadStatus();
 updateCounter();
 loadFaqs().then(renderStats);
