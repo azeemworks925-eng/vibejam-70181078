@@ -22,6 +22,10 @@ Help-desk chatbot for a university Software Engineering department. Students ask
 
 ## How to run (Windows lab PC)
 
+**Quickest way (Windows):** double-click **`Run-AskSE.bat`**. On the first run it creates the virtual environment and installs the dependencies, then it starts the server and opens http://127.0.0.1:8000 in your browser. Close its window to stop the server.
+
+**Manual way:**
+
 Needs Python 3.10+. The page loads Bootstrap from a CDN, so an internet connection is recommended.
 
 ```powershell
@@ -73,4 +77,5 @@ requirements.txt
 .env.example      copy to .env and add your key
 PROMPTS.md        prompt log
 AskSE_Project_Guide.docx   project guide and demo script
+Run-AskSE.bat     double-click launcher (Windows)
 ```
