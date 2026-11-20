@@ -13,6 +13,13 @@ Help-desk chatbot for a university Software Engineering department. Students ask
 | LLM API & model | Groq API (openai/gpt-oss-120b, fallback: qwen/qwen3.8-27b) |
 | AI tools used | Claude Code (Opus 5.5), Claude |
 
+## Documentation
+
+- **[AskSE_Project_Guide.docx](AskSE_Project_Guide.docx):** project guide for judges: how to run, the two modes and the API key, how it works, must-have coverage, and a demo script with test questions and expected results.
+- **[PROMPTS.md](PROMPTS.md):** vibe log of every prompt with its time, bug fixes, the app's AI prompt and what the AI got wrong.
+
+> **No API key needed to try it.** The key is kept out of the repository for security, so a fresh download runs in **demo mode** (offline FAQ matching). Add your own Groq key in `.env` to use **AI mode**.
+
 ## How to run (Windows lab PC)
 
 Needs Python 3.10+. The page loads Bootstrap from a CDN, so an internet connection is recommended.
@@ -65,4 +72,5 @@ static/           index.html, app.js, style.css, logo.svg
 requirements.txt
 .env.example      copy to .env and add your key
 PROMPTS.md        prompt log
+AskSE_Project_Guide.docx   project guide and demo script
 ```
