@@ -1,0 +1,6 @@
+.env
+askse.db
+__pycache__/
+venv/
+.venv/
+*.pyc

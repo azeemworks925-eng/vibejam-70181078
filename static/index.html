@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AskSE</title>
+  <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="/static/style.css" rel="stylesheet">
+</head>
+<body>
+
+<!-- ============ Top bar ============ -->
+<nav class="navbar navbar-expand bg-white border-bottom sticky-top">
+  <div class="container">
+    <a class="navbar-brand d-flex align-items-center gap-2 fw-bold" href="#" data-tab="chat">
+      <img src="/static/logo.svg" alt="" width="34" height="34">
+      <span>Ask<span class="text-brand">SE</span></span>
+    </a>
+    <ul class="nav nav-pills gap-1" id="mainTabs">
+      <li class="nav-item"><button class="nav-link active" data-tab="chat"><i class="bi bi-chat-dots"></i><span class="d-none d-sm-inline"> Chat</span></button></li>
+      <li class="nav-item"><button class="nav-link" data-tab="faqs"><i class="bi bi-question-circle"></i><span class="d-none d-sm-inline"> FAQs</span></button></li>
+      <li class="nav-item"><button class="nav-link" data-tab="admin"><i class="bi bi-shield-lock"></i><span class="d-none d-sm-inline"> Admin</span></button></li>
+      <li class="nav-item"><button class="nav-link" data-tab="about"><i class="bi bi-info-circle"></i><span class="d-none d-sm-inline"> About</span></button></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="container py-4">
+
+  <!-- ============ CHAT ============ -->
+  <section id="tab-chat" class="tab-section">
+    <div class="card shadow-sm chat-card">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <div>
+          <h1 class="h5 mb-0">Department Help Desk</h1>
+          <small class="text-muted">Ask in English or Roman Urdu</small>
+        </div>
+        <button class="btn btn-outline-danger btn-sm" id="clearChatBtn"><i class="bi bi-trash"></i> Clear chat</button>
+      </div>
+
+      <div class="alert alert-warning rounded-0 mb-0 py-2 small" role="note">
+        <i class="bi bi-exclamation-triangle"></i>
+        Answers are AI-generated from the department FAQ. Verify important information with the office.
+      </div>
+
+      <div class="card-body chat-body" id="chatBody">
+        <div class="text-center text-muted my-5" id="chatEmpty">
+          <img src="/static/logo.svg" alt="" width="56" height="56" class="mb-2 opacity-75">
+          <p class="mb-1">Hi! I am AskSE. Ask me about labs, exams, fees, library, transport and more.</p>
+          <small>e.g. "What are the library timings?" or "Bus kab chalti hai?"</small>
+        </div>
+      </div>
+
+      <div class="card-footer bg-white">
+        <form id="chatForm" novalidate>
+          <div class="input-group">
+            <input type="text" class="form-control" id="chatInput" placeholder="Type your question..." autocomplete="off">
+            <button class="btn btn-brand" type="submit" id="sendBtn"><i class="bi bi-send"></i> Send</button>
+          </div>
+          <div class="d-flex justify-content-between mt-1 small">
+            <span class="text-danger" id="chatError"></span>
+            <span class="text-muted" id="charCounter">0/300</span>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FAQS ============ -->
+  <section id="tab-faqs" class="tab-section d-none">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h1 class="h4 mb-0">Department FAQs</h1>
+      <span class="badge text-bg-secondary" id="faqCount"></span>
+    </div>
+    <div class="table-responsive card shadow-sm">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr><th style="width:90px">ID</th><th style="width:120px">Category</th><th>Question</th><th>Answer</th></tr>
+        </thead>
+        <tbody id="faqTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ ADMIN ============ -->
+  <section id="tab-admin" class="tab-section d-none">
+    <!-- PIN screen -->
+    <div id="adminLogin" class="card shadow-sm mx-auto" style="max-width:380px">
+      <div class="card-body p-4 text-center">
+        <i class="bi bi-shield-lock fs-1 text-brand"></i>
+        <h1 class="h5 mt-2">Admin access</h1>
+        <form id="pinForm" novalidate>
+          <input type="password" class="form-control text-center mb-2" id="pinInput" placeholder="Enter PIN" inputmode="numeric" autocomplete="off">
+          <div class="text-danger small mb-2" id="pinError"></div>
+          <button class="btn btn-brand w-100" type="submit">Unlock</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Admin panel -->
+    <div id="adminPanel" class="d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h4 mb-0">Admin</h1>
+        <button class="btn btn-outline-secondary btn-sm" id="lockBtn"><i class="bi bi-lock"></i> Lock</button>
+      </div>
+      <div class="row g-4">
+        <div class="col-lg-7">
+          <div class="card shadow-sm">
+            <div class="card-header bg-white fw-semibold">Add a new FAQ</div>
+            <div class="card-body">
+              <form id="faqForm" novalidate>
+                <div class="mb-3">
+                  <label class="form-label" for="faqCategory">Category</label>
+                  <select class="form-select" id="faqCategory">
+                    <option value="">-- Select category --</option>
+                  </select>
+                  <div class="invalid-feedback" id="errCategory"></div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label" for="faqQuestion">Question <small class="text-muted">(10–150 characters)</small></label>
+                  <input type="text" class="form-control" id="faqQuestion">
+                  <div class="d-flex justify-content-between">
+                    <div class="invalid-feedback d-block" id="errQuestion"></div>
+                    <small class="text-muted ms-auto" id="qCounter">0/150</small>
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label" for="faqAnswer">Answer <small class="text-muted">(10–400 characters)</small></label>
+                  <textarea class="form-control" id="faqAnswer" rows="4"></textarea>
+                  <div class="d-flex justify-content-between">
+                    <div class="invalid-feedback d-block" id="errAnswer"></div>
+                    <small class="text-muted ms-auto" id="aCounter">0/400</small>
+                  </div>
+                </div>
+                <button class="btn btn-brand" type="submit"><i class="bi bi-plus-lg"></i> Save FAQ</button>
+                <span class="ms-2 small" id="faqSaveMsg"></span>
+              </form>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-5">
+          <div class="card shadow-sm border-danger-subtle">
+            <div class="card-header bg-white fw-semibold">Starter data</div>
+            <div class="card-body">
+              <p class="small text-muted">Delete all FAQs and restore the original 8 starter FAQs (FAQ-01 to FAQ-08). Chat history is not affected.</p>
+              <button class="btn btn-outline-danger" id="resetBtn"><i class="bi bi-arrow-counterclockwise"></i> Reset to starter data</button>
+              <div class="small mt-2" id="resetMsg"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ABOUT ============ -->
+  <!-- Edit the team details below (replace the ✏️ placeholders). -->
+  <section id="tab-about" class="tab-section d-none">
+    <div class="card shadow-sm mx-auto" style="max-width:720px">
+      <div class="card-body p-4">
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <img src="/static/logo.svg" alt="AskSE logo" width="56" height="56">
+          <div>
+            <h1 class="h4 mb-0">About AskSE</h1>
+            <small class="text-muted">Help-desk chatbot for the Software Engineering department</small>
+          </div>
+        </div>
+        <table class="table about-table mb-0">
+          <tbody>
+            <tr><th>Entry ID</th><td>70181078</td></tr>
+            <tr><th>Team name</th><td>✏️</td></tr>
+            <tr><th>Members</th><td>Muhammad Azeem, ✏️</td></tr>
+            <tr><th>Repo</th><td><a href="https://github.com/azeemworks925-eng/vibejam-70181078" target="_blank" rel="noopener">https://github.com/azeemworks925-eng/vibejam-70181078</a></td></tr>
+            <tr><th>LLM API &amp; model</th><td>Google Gemini API (gemini-3.8-flash, fallback: gemini-flash-latest)</td></tr>
+            <tr><th>AI tools used</th><td>Claude Code (Opus 5.5), Claude</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ============ Reusable confirmation modal ============ -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-6" id="confirmTitle">Confirm</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="confirmText"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="confirmCancel">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmOk">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
