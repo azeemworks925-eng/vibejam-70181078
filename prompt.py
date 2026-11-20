@@ -1,7 +1,7 @@
 """
 AskSE - LLM system prompt.
 
-This file holds the exact instructions sent to Google Gemini as the
+This file holds the exact instructions sent to the LLM (Groq) as the
 "system instruction". The FAQ list and the student's question are sent
 separately as the user message (see build_user_message below).
 

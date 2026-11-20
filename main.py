@@ -1,6 +1,6 @@
 """
 AskSE - help-desk chatbot for the Software Engineering department.
-Backend: FastAPI + SQLite + Google Gemini REST API.
+Backend: FastAPI + SQLite + Groq chat completions API (OpenAI-compatible).
 
 Run:  python main.py      (then open http://127.0.0.1:8000)
 """
@@ -28,11 +28,15 @@ ENV_PATH = BASE_DIR / ".env"
 STATIC_DIR = BASE_DIR / "static"
 
 ADMIN_PIN = "2026"
-# Primary model + fallback. If the first call times out / is overloaded (429, 503 ...),
-# we retry ONCE with the other model. Both calls together must finish within 30 s.
-# (gemini-2.5-flash now returns 404 "no longer available to new users".)
-GEMINI_MODELS = ["gemini-3.8-flash", "gemini-flash-latest"]
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+# LLM provider: Groq (OpenAI-compatible chat completions API, JSON mode).
+# Primary model + fallback. If the first call times out / is rate-limited / overloaded
+# (429, 5xx), we retry ONCE with the other model. Both calls together stay within 30 s.
+# Extra settings per model keep "thinking" to a minimum so answers come back fast.
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_MODELS = {
+    "openai/gpt-oss-120b": {"reasoning_effort": "low"},   # primary
+    "qwen/qwen3.8-27b": {"reasoning_effort": "none"},     # fallback
+}
 AI_TIMEOUT_SECONDS = 30          # total time budget for one chat message
 FIRST_TRY_TIMEOUT = 18           # max seconds for the first attempt, leaving time for the retry
 RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
@@ -117,32 +121,33 @@ def ask_ai(api_key, user_message):
     if not api_key:
         raise AIServiceError("No API key")
     deadline = time.monotonic() + AI_TIMEOUT_SECONDS
-    primary, fallback = GEMINI_MODELS
+    primary, fallback = list(GROQ_MODELS)
     try:
-        return call_gemini(api_key, primary, user_message, FIRST_TRY_TIMEOUT)
+        return call_groq(api_key, primary, user_message, FIRST_TRY_TIMEOUT)
     except AIServiceError as e:
         remaining = deadline - time.monotonic()
         if not e.retryable or remaining < 3:
             raise
         print(f"{primary} failed ({e}); retrying with {fallback}")
-        return call_gemini(api_key, fallback, user_message, remaining)
+        return call_groq(api_key, fallback, user_message, remaining)
 
 
-def call_gemini(api_key, model, user_message, timeout):
-    """Call one Gemini model in JSON mode. Returns the raw text reply. Raises AIServiceError on failure."""
+def call_groq(api_key, model, user_message, timeout):
+    """Call one Groq model in JSON mode. Returns the raw text reply. Raises AIServiceError on failure."""
     body = {
-        "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-        "contents": [{"role": "user", "parts": [{"text": user_message}]}],
-        "generationConfig": {
-            "responseMimeType": "application/json",
-            "temperature": 0,
-            "thinkingConfig": {"thinkingBudget": 0},
-        },
+        "model": model,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_message},
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0,
+        **GROQ_MODELS[model],
     }
     try:
         resp = httpx.post(
-            GEMINI_URL.format(model=model),
-            headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+            GROQ_URL,
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json=body,
             timeout=timeout,
         )
@@ -150,18 +155,20 @@ def call_gemini(api_key, model, user_message, timeout):
         raise AIServiceError(f"{model}: connection error {type(e).__name__}")
     except httpx.HTTPError as e:  # timeout, dropped connection ...
         raise AIServiceError(f"{model}: network error {type(e).__name__}", retryable=True)
-    if resp.status_code != 200:  # invalid key (400/403), quota (429), overloaded (503) ...
+    if resp.status_code != 200:  # invalid key (401), rate limit (429), overloaded (5xx) ...
         try:
-            detail = resp.json()["error"]["message"][:200]
+            error = resp.json()["error"]
         except (ValueError, KeyError, TypeError):
-            detail = ""
+            error = {}
+        if error.get("code") == "json_validate_failed":
+            return ""  # the model produced invalid JSON -> treated as "not found"
+        detail = str(error.get("message", ""))[:200]
         raise AIServiceError(f"{model}: HTTP {resp.status_code} {detail}",
                              retryable=resp.status_code in RETRY_STATUS_CODES)
     try:
-        return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        return resp.json()["choices"][0]["message"]["content"] or ""
     except (KeyError, IndexError, ValueError, TypeError):
-        # The service answered but with no usable text (e.g. blocked by safety) -> treat as not found
-        return ""
+        return ""  # no usable text -> treated as "not found"
 
 
 def validate_reply(raw_text, faqs, api_key):
