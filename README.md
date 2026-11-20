@@ -7,8 +7,8 @@ Help-desk chatbot for a university Software Engineering department. Students ask
 | | |
 |---|---|
 | Entry ID | 70181078 |
-| Team name | ✏️ |
-| Members | Muhammad Azeem, ✏️ |
+| Team name | ____ |
+| Members | Muhammad Azeem, ____ |
 | Repo | https://github.com/azeemworks925-eng/vibejam-70181078 |
 | LLM API & model | Groq API (openai/gpt-oss-120b, fallback: qwen/qwen3.8-27b) |
 | AI tools used | Claude Code (Opus 5.5), Claude |

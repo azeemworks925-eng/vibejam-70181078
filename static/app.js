@@ -6,6 +6,15 @@ const MSG_NOT_FOUND = "Sorry, I could not find this in the department FAQ. Pleas
 const MSG_AI_DOWN   = "AI service unavailable. Check your connection or API key and try again.";
 const MAX_CHARS = 300;
 const CHAT_KEY = "askse_chat_history";
+const STATS_KEY = "askse_stats";
+const THEME_KEY = "askse_theme";
+const SUGGESTIONS = [
+  "What are the library timings?",
+  "When do the university buses leave?",
+  "What is the attendance requirement?",
+  "How do I submit my FYP proposal?",
+  "Fee kab tak jama karni hai?",
+];
 const CLIENT_TIMEOUT_MS = 35000; // backend gives up after 30 s; this is a safety net
 
 const $ = (id) => document.getElementById(id);
@@ -20,6 +29,7 @@ function showTab(name) {
     b.classList.toggle("active", b.dataset.tab === name)
   );
   if (name === "faqs") loadFaqs();
+  if (name === "stats") loadFaqs().then(renderStats);
   if (name === "chat") $("chatInput").focus();
 }
 document.querySelectorAll("[data-tab]").forEach((el) =>
@@ -88,9 +98,45 @@ function renderMessage(msg) {
   time.textContent = msg.time;
   bubble.appendChild(time);
 
+  // "Helpful / Not helpful" on every bot answer (not on "AI unavailable" errors)
+  if (msg.role === "bot" && msg.kind !== "error") bubble.appendChild(feedbackButtons(msg));
+
   row.appendChild(bubble);
   $("chatBody").appendChild(row);
   scrollChat();
+}
+
+// msg.feedback is "up", "down" or undefined. It is saved with the message in localStorage.
+function feedbackButtons(msg) {
+  const box = document.createElement("div");
+  box.className = "feedback";
+  const options = [
+    ["up", "Helpful", "bi-hand-thumbs-up", "success"],
+    ["down", "Not helpful", "bi-hand-thumbs-down", "danger"],
+  ];
+  const buttons = options.map(([value, label, icon, color]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.innerHTML = `<i class="bi ${icon}"></i> `;
+    b.append(label);
+    b.addEventListener("click", () => {
+      const old = msg.feedback;
+      msg.feedback = old === value ? undefined : value;   // click again = undo
+      changeFeedbackStats(old, msg.feedback);
+      saveHistory(chatHistory);
+      paint();
+    });
+    b.paint = () => {
+      const on = msg.feedback === value;
+      b.className = "btn " + (on ? "btn-" + color : "btn-outline-secondary");
+      b.setAttribute("aria-pressed", on);
+    };
+    return b;
+  });
+  const paint = () => buttons.forEach((b) => b.paint());
+  paint();
+  box.append(...buttons);
+  return box;
 }
 
 function addMessage(msg) {
@@ -165,16 +211,22 @@ $("chatForm").addEventListener("submit", async (e) => {
   hideTyping();
   setWaiting(false);
 
+  stats.asked++;
   if (data.status === "found") {
     addMessage({ role: "bot", text: data.answer, refs: data.faq_ids });
     chatInput.value = "";          // clear only on success
+    stats.answered++;
+    data.faq_ids.forEach((id) => { stats.cited[id] = (stats.cited[id] || 0) + 1; });
   } else if (data.status === "not_found") {
     addMessage({ role: "bot", text: MSG_NOT_FOUND });
     chatInput.value = "";
+    stats.notFound++;
   } else {
     addMessage({ role: "bot", text: MSG_AI_DOWN, kind: "error" });
     // keep the typed message in the input box so the user can retry
+    stats.errors++;
   }
+  saveStats();
   updateCounter();
   chatInput.focus();
 });
@@ -183,7 +235,23 @@ function setWaiting(on) {
   waiting = on;
   $("sendBtn").disabled = on;
   chatInput.readOnly = on;
+  document.querySelectorAll("#suggestions .btn").forEach((b) => (b.disabled = on));
 }
+
+// Suggested-question chips: click = put the question in the box and send it
+SUGGESTIONS.forEach((q) => {
+  const chip = document.createElement("button");
+  chip.type = "button";
+  chip.className = "btn btn-sm btn-outline-secondary";
+  chip.textContent = q;
+  chip.addEventListener("click", () => {
+    if (waiting) return;
+    chatInput.value = q;
+    updateCounter();
+    $("chatForm").requestSubmit();
+  });
+  $("suggestions").appendChild(chip);
+});
 
 $("clearChatBtn").addEventListener("click", () => {
   askConfirm("Clear all messages?", "Clear", () => {
@@ -198,6 +266,7 @@ $("clearChatBtn").addEventListener("click", () => {
 // FAQ list
 // =====================================================================
 let categories = [];
+let faqList = [];
 
 async function loadFaqs() {
   const body = $("faqTableBody");
@@ -205,6 +274,7 @@ async function loadFaqs() {
     const res = await fetch("/api/faqs");
     const data = await res.json();
     categories = data.categories;
+    faqList = data.faqs;
     fillCategoryDropdown();
     body.innerHTML = "";
     data.faqs.forEach((f) => {
@@ -217,7 +287,7 @@ async function loadFaqs() {
       });
       tr.children[1].innerHTML = "";
       const badge = document.createElement("span");
-      badge.className = "badge rounded-pill text-bg-light border";
+      badge.className = "badge rounded-pill bg-body-tertiary text-body border";
       badge.textContent = f.category;
       tr.children[1].appendChild(badge);
       body.appendChild(tr);
@@ -350,6 +420,73 @@ $("resetBtn").addEventListener("click", () => {
   });
 });
 
+// =====================================================================
+// Stats (localStorage, separate from chat so "Clear chat" keeps them)
+// =====================================================================
+function emptyStats() {
+  return { asked: 0, answered: 0, notFound: 0, errors: 0, helpful: 0, notHelpful: 0, cited: {} };
+}
+function loadStats() {
+  try { return { ...emptyStats(), ...JSON.parse(localStorage.getItem(STATS_KEY)) }; }
+  catch { return emptyStats(); }
+}
+function saveStats() {
+  try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch { /* ignore */ }
+  renderStats();
+}
+let stats = loadStats();
+
+function changeFeedbackStats(oldValue, newValue) {
+  if (oldValue === "up") stats.helpful--;
+  if (oldValue === "down") stats.notHelpful--;
+  if (newValue === "up") stats.helpful++;
+  if (newValue === "down") stats.notHelpful++;
+  saveStats();
+}
+
+function renderStats() {
+  $("statAsked").textContent = stats.asked;
+  $("statAnswered").textContent = stats.answered;
+  $("statNotFound").textContent = stats.notFound;
+  $("statErrors").textContent = stats.errors;
+  $("statHelpful").textContent = stats.helpful;
+  $("statNotHelpful").textContent = stats.notHelpful;
+
+  // most-cited FAQ: highest count, ties -> lowest ID
+  const top = Object.entries(stats.cited).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+  if (!top) {
+    $("statTopFaq").textContent = "–";
+    $("statTopFaqText").textContent = "No answers yet";
+    return;
+  }
+  const faq = faqList.find((f) => f.id === top[0]);
+  $("statTopFaq").textContent = top[0];
+  $("statTopFaqText").textContent =
+    (faq ? faq.question + " · " : "") + "cited " + top[1] + (top[1] === 1 ? " time" : " times");
+}
+
+$("resetStatsBtn").addEventListener("click", () => {
+  askConfirm("Reset all stats to zero? Chat and FAQs are not affected.", "Reset", () => {
+    stats = emptyStats();
+    saveStats();
+  });
+});
+
+// =====================================================================
+// Dark mode (saved in localStorage; applied early in <head> to avoid a flash)
+// =====================================================================
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-bs-theme", theme);
+  $("themeIcon").className = theme === "dark" ? "bi bi-sun" : "bi bi-moon-stars";
+  $("themeBtn").title = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+}
+$("themeBtn").addEventListener("click", () => {
+  const next = document.documentElement.getAttribute("data-bs-theme") === "dark" ? "light" : "dark";
+  applyTheme(next);
+  try { localStorage.setItem(THEME_KEY, next); } catch { /* ignore */ }
+});
+applyTheme(document.documentElement.getAttribute("data-bs-theme") || "light");
+
 // initial load
 updateCounter();
-loadFaqs();
+loadFaqs().then(renderStats);
