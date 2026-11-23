@@ -1,6 +1,14 @@
+# Secrets: never commit API keys (any .env variant)
 .env
+.env.*
+!.env.example
+
+# Local data and environments
 askse.db
 __pycache__/
+*.pyc
 venv/
 .venv/
-*.pyc
+
+# Local copies saved by the Claude desktop app
+Claude outputs/
